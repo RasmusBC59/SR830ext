@@ -1,4 +1,5 @@
 import numpy as np
+from time import sleep
 from qcodes.utils.validators import Numbers, Arrays
 from qcodes.instrument.parameter import ParameterWithSetpoints, Parameter, DelegateParameter
 from qcodes.instrument_drivers.stanford_research.SR830 import SR830 
@@ -17,6 +18,7 @@ class GeneratedSetPoints(Parameter):
         self._stopparam = stopparam
         self._numpointsparam = numpointsparam
 
+
     def get_raw(self):
         return np.linspace(self._startparam(), self._stopparam(),
                               self._numpointsparam())        
@@ -24,9 +26,10 @@ class GeneratedSetPoints(Parameter):
 
 class Lockin(SR830):    
         
-    def __init__(self, name, address, set_object, **kwargs):
+    def __init__(self, name, address, set_object, wait_time:float = 0.01, **kwargs):
         super().__init__(name, address, **kwargs)
         self.set_object = set_object
+        self.wait_time = wait_time
         self.add_parameter('sweep_start',
                            source=None,
                            parameter_class=DelegateParameter)
@@ -63,9 +66,10 @@ class Lockin(SR830):
         axis = self.setpoints()
         self.buffer_reset()
         for x in axis:
-            self.set_object(x)
+            self.set_object.set(x)
+            sleep(self.wait_time)
             self.send_trigger()
-        self.prepare_buffer_readout()    
+        self.ch1_databuffer.prepare_buffer_readout()    
         return self.ch1_databuffer.get()
 
     def set_sweep_parameters(self, start_parameter, stop_parameter, label=None):
