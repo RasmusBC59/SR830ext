@@ -24,7 +24,7 @@ class GeneratedSetPoints(Parameter):
                               self._numpointsparam())        
 
 
-class Lockin(SR830):    
+class SR830_ext(SR830):    
         
     def __init__(self, name, address, wait_time:float = 0.01, **kwargs):
         super().__init__(name, address, **kwargs)
