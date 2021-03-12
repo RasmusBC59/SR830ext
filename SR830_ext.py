@@ -26,17 +26,26 @@ class GeneratedSetPoints(Parameter):
 
 class Lockin(SR830):    
         
-    def __init__(self, name, address, set_object, wait_time:float = 0.01, **kwargs):
+    def __init__(self, name, address, wait_time:float = 0.01, **kwargs):
         super().__init__(name, address, **kwargs)
-        self.set_object = set_object
         self.wait_time = wait_time
-        self.add_parameter('sweep_start',
+
+        self.add_parameter('sweep_param',
                            source=None,
                            parameter_class=DelegateParameter)
 
+        
+        self.add_parameter('sweep_start',
+                           unit='',
+                           initial_value=0,
+                           get_cmd=None,
+                           set_cmd=None) 
+
         self.add_parameter('sweep_stop',
-                           source=None,
-                           parameter_class=DelegateParameter)
+                           unit='',
+                           initial_value=1,
+                           get_cmd=None,
+                           set_cmd=None)                                                 
 
         self.add_parameter('sweep_n_points',
                            unit='',
@@ -66,19 +75,23 @@ class Lockin(SR830):
         axis = self.setpoints()
         self.buffer_reset()
         for x in axis:
-            self.set_object.set(x)
+            self.sweep_param.set(x)
             sleep(self.wait_time)
             self.send_trigger()
         self.ch1_databuffer.prepare_buffer_readout()    
         return self.ch1_databuffer.get()
 
-    def set_sweep_parameters(self, start_parameter, stop_parameter, label=None):
-        if start_parameter.unit != stop_parameter.unit:
-            raise TypeError("You must sweep from and to "
-                            "parameters with the same unit")
-        self.sweep_start.source = start_parameter
-        self.sweep_stop.source = stop_parameter
-        self.setpoints.unit = start_parameter.unit
+    def set_sweep_parameters(self,sweep_param, start, stop, label=None):
+        self.sweep_param.source = sweep_param
+        
+        self.sweep_start.unit = sweep_param.unit
+        self.sweep_start.vals = sweep_param.vals
+        self.sweep_start.set(start)
+        
+        self.sweep_stop.unit = sweep_param.unit
+        self.sweep_stop.vals = sweep_param.vals
+        self.sweep_stop.set(stop)
+        self.setpoints.unit = sweep_param.unit
         if label != None:
             self.setpoints.label = label
 
