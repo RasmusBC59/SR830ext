@@ -26,9 +26,9 @@ class GeneratedSetPoints(Parameter):
 
 class SR830_ext(SR830):    
         
-    def __init__(self, name, address, wait_time:float = 0.01, **kwargs):
+    def __init__(self, name, address, **kwargs):
         super().__init__(name, address, **kwargs)
-        self.wait_time = wait_time
+
 
         self.add_parameter('sweep_param',
                            source=None,
@@ -60,6 +60,12 @@ class SR830_ext(SR830):
                            stopparam=self.sweep_stop,
                            numpointsparam=self.sweep_n_points,
                            vals=Arrays(shape=(self.sweep_n_points.get_latest,)))
+                
+        self.add_parameter('sweep_wait_time',
+                           unit='s',
+                           initial_value=0.1,
+                           get_cmd=None,
+                           set_cmd=None) 
         
         self.add_parameter(name='trace',
                            get_cmd=self._get_current_data,
@@ -76,12 +82,12 @@ class SR830_ext(SR830):
         self.buffer_reset()
         for x in axis:
             self.sweep_param.set(x)
-            sleep(self.wait_time)
+            sleep(self.sweep_wait_time.get())
             self.send_trigger()
         self.ch1_databuffer.prepare_buffer_readout()    
         return self.ch1_databuffer.get()
 
-    def set_sweep_parameters(self,sweep_param, start, stop, label=None):
+    def set_sweep_parameters(self,sweep_param, start, stop, n_points=10, wait_time=0.1, label=None):
         self.sweep_param.source = sweep_param
         
         self.sweep_start.unit = sweep_param.unit
@@ -91,6 +97,8 @@ class SR830_ext(SR830):
         self.sweep_stop.unit = sweep_param.unit
         self.sweep_stop.vals = sweep_param.vals
         self.sweep_stop.set(stop)
+        self.sweep_n_points.set(n_points)
+        self.sweep_wait_time.set(wait_time)
         self.setpoints.unit = sweep_param.unit
         if label != None:
             self.setpoints.label = label
