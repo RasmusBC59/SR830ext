@@ -87,6 +87,10 @@ class SR830_ext(SR830):
         self.ch1_databuffer.prepare_buffer_readout()    
         return self.ch1_databuffer.get()
 
+    def prepare_and_get_buffer(self):   
+        self.ch1_databuffer.prepare_buffer_readout()    
+        return self.ch1_databuffer.get()
+
     def set_sweep_parameters(self,sweep_param, start, stop, n_points=10, wait_time=0.1, label=None):
         self.sweep_param.source = sweep_param
         
