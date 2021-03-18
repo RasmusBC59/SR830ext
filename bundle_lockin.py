@@ -34,22 +34,17 @@ class BundleLockin(Instrument):
                             numpointsparam=self.sweep_n_points,
                             vals=Arrays(shape=(self.sweep_n_points.get_latest,)))
 
-       self.add_parameter(name='trace',
-                           get_cmd=self._get_current_data,
-                           label='Signal',
-                           unit='V',
-                           vals=Arrays(shape=(self.sweep_n_points.get_latest,)),
-                           setpoints=(self.setpoints,),
-                           parameter_class=ParameterWithSetpoints
-                           )               
-
-
-       for lockin in lockins:
-            self.add_parameter('readout_freq_{}'.format(lockin.name),
-                        label='Readout Frequency {}'.format(lockin.name),
-                        get_cmd = lockin._get_current_data
-                        label='Signal',
+        for lockin in lockins:
+            self.add_parameter('trace_{}'.format(lockin.name),
+                        label='Signal {}'.format(lockin.name),
+                        get_cmd = _get_current_data(lockin),
                         unit='V',
                         vals=Arrays(shape=(self.sweep_n_points.get_latest,)),
                         setpoints=(self.setpoints,),
-                        parameter_class=ParameterWithSetpoints       
+                        parameter_class=ParameterWithSetpoints)
+
+
+
+    def _get_current_data(lockin):
+        lockin.ch1_databuffer.prepare_buffer_readout()    
+        return lockin.ch1_databuffer.get()       
