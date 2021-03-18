@@ -4,9 +4,12 @@ from qcodes.utils.validators import Numbers, Arrays
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ParameterWithSetpoints, Parameter, DelegateParameter
 
+
 class BundleLockin(Instrument):
     def __init__(self, name: str, lockins, *args, **kwargs) -> None:
         super().__init__(name, *args, **kwargs)
+
+        self.lockins = lockins
 
         self.add_parameter('sweep_start',
                            unit='',
@@ -37,7 +40,7 @@ class BundleLockin(Instrument):
         for lockin in lockins:
             self.add_parameter('trace_{}'.format(lockin.name),
                         label='Signal {}'.format(lockin.name),
-                        get_cmd = _get_current_data(lockin),
+                        get_cmd = lockin.prepare_and_get_buffer,
                         unit='V',
                         vals=Arrays(shape=(self.sweep_n_points.get_latest,)),
                         setpoints=(self.setpoints,),
@@ -45,6 +48,33 @@ class BundleLockin(Instrument):
 
 
 
-    def _get_current_data(lockin):
-        lockin.ch1_databuffer.prepare_buffer_readout()    
-        return lockin.ch1_databuffer.get()       
+    def set_sweep_parameters(self,sweep_param, start, stop, n_points=10, label=None):
+        
+        self.sweep_start.unit = sweep_param.unit
+        self.sweep_start.vals = sweep_param.vals
+        self.sweep_start.set(start)
+        
+        self.sweep_stop.unit = sweep_param.unit
+        self.sweep_stop.vals = sweep_param.vals
+        self.sweep_stop.set(stop)
+        self.sweep_n_points.set(n_points)
+        self.setpoints.unit = sweep_param.unit
+        if label != None:
+            self.setpoints.label = label     
+
+
+class GeneratedSetPoints(Parameter):
+    """
+    A parameter that generates a setpoint array from start, stop and num points
+    parameters.
+    """
+    def __init__(self, startparam, stopparam, numpointsparam, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._startparam = startparam
+        self._stopparam = stopparam
+        self._numpointsparam = numpointsparam
+
+
+    def get_raw(self):
+        return np.linspace(self._startparam(), self._stopparam(),
+                              self._numpointsparam())     
