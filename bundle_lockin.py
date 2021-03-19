@@ -1,8 +1,9 @@
 import numpy as np
-from time import sleep
+import time
 from qcodes.utils.validators import Numbers, Arrays
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ParameterWithSetpoints, Parameter, DelegateParameter
+from qcodes import Measurement
 
 
 class BundleLockin(Instrument):
@@ -77,4 +78,61 @@ class GeneratedSetPoints(Parameter):
 
     def get_raw(self):
         return np.linspace(self._startparam(), self._stopparam(),
-                              self._numpointsparam())     
+                              self._numpointsparam())
+
+
+def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
+         param_fast, start_fast, stop_fast, num_points_fast, delay_fast,
+         bundle,
+          refresh_time= 1.
+              ):
+
+    begin_time = time.time()
+    meas = Measurement()
+    bundle.set_sweep_parameters(param_fast, start_fast,stop_fast,num_points_fast, label="Voltage")
+    interval_slow = np.linspace(start_slow,stop_slow,num_points_slow)
+    meas.write_period = refresh_time
+    set_points_fast = bundle.setpoints
+
+    meas.register_parameter(set_points_fast)
+    param_fast.post_delay = delay_fast
+ 
+    meas.register_parameter(param_slow)
+    param_slow.post_delay = delay_slow
+
+
+    bundle_parameters = bundle.__dict__['parameters']
+    traces = [bundle_parameters[key] for key in bundle_parameters.keys() if 'trace' in key]
+    for trace in traces:
+            meas.register_parameter(trace, setpoints=(param_slow, set_points_fast))
+
+#progress_bar = progressbar.ProgressBar(max_value=num_points_slow * num_points_fast)
+    points_taken = 0
+    time.sleep(0.1)
+
+    with meas.run(write_in_background=True) as datasaver:
+        run_id = datasaver.run_id
+    
+        for point_slow in interval_slow:
+            param_slow.set(point_slow)
+        
+            for lockin in bundle.lockins:
+                lockin.buffer_reset()
+                
+            for point_fast in set_points_fast.get():
+                param_slow.set(point_fast)
+                time.sleep(0.1)
+                for lockin in bundle.lockins:
+                    lockin.send_trigger()
+                    points_taken += 1
+                    print(points_taken)
+                    
+            data = []
+            for trace in traces:   
+                data.append((trace,trace.get()))
+            data.append((param_slow,param_slow.get()))
+            data.append((set_points_fast,set_points_fast.get()))
+            datasaver.add_result(*data)
+
+    message = 'Have finished the measurement in {} seconds. run_id {}'.format(time.time()-begin_time,run_id)
+    print(message)
