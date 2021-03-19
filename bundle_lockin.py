@@ -86,7 +86,7 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
          param_fast, start_fast, stop_fast, num_points_fast, delay_fast,
          bundle,
          write_period=1.,
-         threading=True
+         threading=[True,True,True,True]
               ):
 
     begin_time = time.time()
@@ -112,13 +112,13 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
     points_taken = 0
     time.sleep(0.1)
 
-    with meas.run(write_in_background=threading) as datasaver:
+    with meas.run(write_in_background=threading[0]) as datasaver:
         run_id = datasaver.run_id
     
         for point_slow in interval_slow:
             param_slow.set(point_slow)
         
-            if threading:
+            if threading[1]:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     for lockin in bundle.lockins:
                         executor.submit(lockin.buffer_reset)
@@ -130,7 +130,7 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
                 param_fast.set(point_fast)
                 time.sleep(0.1)
                 
-                if threading:
+                if threading[2]:
                     with concurrent.futures.ThreadPoolExecutor() as executor:
                         for lockin in bundle.lockins:
                             executor.submit(lockin.send_trigger)
@@ -141,7 +141,7 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
                         print(points_taken)
                     
             
-            if threading:
+            if threading[3]:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     data = [executor.submit(trace_tuble,trace) for trace in traces]
             else:
