@@ -107,7 +107,8 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
     traces = [bundle_parameters[key] for key in bundle_parameters.keys() if 'trace' in key]
     for trace in traces:
             meas.register_parameter(trace, setpoints=(param_slow, set_points_fast))
-
+    time_fast_loop = 0.0
+    time_set_fast = 0.0
     time_buffer_reset = 0.0
     time_trigger_send = 0.0
     time_get_trace = 0.0
@@ -122,7 +123,7 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
         for point_slow in interval_slow:
             param_slow.set(point_slow)
 
-            begin_time_temp = time.perf_counter()
+            begin_time_temp_buffer = time.perf_counter()
             if threading[1]:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     for lockin in bundle.lockins:
@@ -130,12 +131,15 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
             else:
                 for lockin in bundle.lockins:
                     lockin.buffer_reset()
-            time_buffer_reset += time.perf_counter() - begin_time_temp
-
+            time_buffer_reset += time.perf_counter() - begin_time_temp_buffer
+            
+            begin_time_temp_fast_loop = time.perf_counter()
             for point_fast in set_points_fast.get():
+                begin_time_temp_set_fast = time.perf_counter()
                 param_fast.set(point_fast)
-                time.sleep(0.1)
-                begin_time_temp = time.perf_counter()
+                time_set_fast += time.perf_counter() - begin_time_temp_set_fast
+                #time.sleep(0.1)
+                begin_time_temp_trigger = time.perf_counter()
                 if threading[2]:
                     with concurrent.futures.ThreadPoolExecutor() as executor:
                         for lockin in bundle.lockins:
@@ -143,20 +147,25 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
                 else:
                     for lockin in bundle.lockins:
                         lockin.send_trigger()
-                        points_taken += 1
-                        print(points_taken)
-                time_trigger_send += time.perf_counter() - begin_time_temp    
+                        #points_taken += 1
+                        #print(points_taken)
+                time_trigger_send += time.perf_counter() - begin_time_temp_trigger    
+            time_fast_loop += time.perf_counter() - begin_time_temp_fast_loop  
             
-            
-            begin_time_temp = time.perf_counter()
+            begin_time_temp_trace = time.perf_counter()
             if threading[3]:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    data = [executor.submit(trace_tuble,trace) for trace in traces]
+                    #data = [executor.submit(trace_tuble,trace) for trace in traces]
+                    data = executor.map(trace_tuble,traces)
+                #print(data)
+                #for d in data: print(d)
+                #break
+                data = list(data)
             else:
                 data = []
                 for trace in traces:   
                     data.append((trace,trace.get()))
-            time_get_trace += time.perf_counter() - begin_time_temp
+            time_get_trace += time.perf_counter() - begin_time_temp_trace
 
             data.append((param_slow,param_slow.get()))
             data.append((set_points_fast,set_points_fast.get()))
@@ -166,6 +175,7 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
     print(message)
     message2 = 'Time used in buffer reset {}. Time used in send trigger {}. Time used in get trace {}'.format(time_buffer_reset,time_trigger_send,time_get_trace)
     print(message2)
-
+    print('time in the fast loop {}'.format(time_fast_loop))
+    print('time setting in the fast loop {}'.format(time_set_fast))
 def trace_tuble(trace):
     return (trace,trace.get())
