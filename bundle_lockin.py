@@ -85,14 +85,15 @@ class GeneratedSetPoints(Parameter):
 def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
          param_fast, start_fast, stop_fast, num_points_fast, delay_fast,
          bundle,
-          refresh_time= 1.
+         write_period=1.,
+         threading=True
               ):
 
     begin_time = time.time()
     meas = Measurement()
     bundle.set_sweep_parameters(param_fast, start_fast,stop_fast,num_points_fast, label="Voltage")
     interval_slow = np.linspace(start_slow,stop_slow,num_points_slow)
-    meas.write_period = refresh_time
+    meas.write_period = write_period
     set_points_fast = bundle.setpoints
 
     meas.register_parameter(set_points_fast)
@@ -111,29 +112,49 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
     points_taken = 0
     time.sleep(0.1)
 
-    with meas.run(write_in_background=True) as datasaver:
+    with meas.run(write_in_background=threading) as datasaver:
         run_id = datasaver.run_id
     
         for point_slow in interval_slow:
             param_slow.set(point_slow)
         
-            for lockin in bundle.lockins:
-                lockin.buffer_reset()
+            if threading:
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    for lockin in bundle.lockins:
+                        executor.submit(lockin.buffer_reset)
+            else:
+                for lockin in bundle.lockins:
+                    lockin.buffer_reset()
                 
             for point_fast in set_points_fast.get():
-                param_slow.set(point_fast)
+                param_fast.set(point_fast)
                 time.sleep(0.1)
-                for lockin in bundle.lockins:
-                    lockin.send_trigger()
-                    points_taken += 1
-                    print(points_taken)
+                
+                if threading:
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        for lockin in bundle.lockins:
+                            executor.submit(lockin.send_trigger)
+                else:
+                    for lockin in bundle.lockins:
+                        lockin.send_trigger()
+                        points_taken += 1
+                        print(points_taken)
                     
-            data = []
-            for trace in traces:   
-                data.append((trace,trace.get()))
+            
+            if threading:
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    data = [executor.submit(trace_tuble,trace) for trace in traces]
+            else:
+                data = []
+                for trace in traces:   
+                    data.append((trace,trace.get()))
+
             data.append((param_slow,param_slow.get()))
             data.append((set_points_fast,set_points_fast.get()))
             datasaver.add_result(*data)
 
     message = 'Have finished the measurement in {} seconds. run_id {}'.format(time.time()-begin_time,run_id)
     print(message)
+
+def trace_tuble(trace):
+    return (trace,trace.get())
