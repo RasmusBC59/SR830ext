@@ -1,5 +1,6 @@
 import numpy as np
 from time import sleep
+import concurrent.futures
 from qcodes.utils.validators import Numbers, Arrays
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ParameterWithSetpoints, Parameter, DelegateParameter
