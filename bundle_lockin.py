@@ -1,14 +1,16 @@
 import numpy as np
 import concurrent.futures
 import time
+import progressbar
 from qcodes.utils.validators import Numbers, Arrays
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ParameterWithSetpoints, Parameter, DelegateParameter
 from qcodes import Measurement
 
 
+
 class BundleLockin(Instrument):
-    def __init__(self, name: str, lockins, *args, **kwargs) -> None:
+    def __init__(self, name: str, lockins:tuple, *args, **kwargs) -> None:
         super().__init__(name, *args, **kwargs)
 
         self.lockins = lockins
@@ -86,7 +88,8 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
          param_fast, start_fast, stop_fast, num_points_fast, delay_fast,
          bundle,
          write_period=1.,
-         threading=[True,True,True,True]
+         threading=[True,True,True,True],
+         show_progress_bar = True
               ):
 
     begin_time = time.perf_counter()
@@ -107,15 +110,17 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
     traces = [bundle_parameters[key] for key in bundle_parameters.keys() if 'trace' in key]
     for trace in traces:
             meas.register_parameter(trace, setpoints=(param_slow, set_points_fast))
+    
     time_fast_loop = 0.0
     time_set_fast = 0.0
     time_buffer_reset = 0.0
     time_trigger_send = 0.0
     time_get_trace = 0.0
 
-#progress_bar = progressbar.ProgressBar(max_value=num_points_slow * num_points_fast)
-    points_taken = 0
-    time.sleep(0.1)
+    if show_progress_bar:
+        progress_bar = progressbar.ProgressBar(max_value=num_points_slow * num_points_fast)
+        points_taken = 0
+
 
     with meas.run(write_in_background=threading[0]) as datasaver:
         run_id = datasaver.run_id
@@ -137,8 +142,8 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
             for point_fast in set_points_fast.get():
                 begin_time_temp_set_fast = time.perf_counter()
                 param_fast.set(point_fast)
+                
                 time_set_fast += time.perf_counter() - begin_time_temp_set_fast
-                #time.sleep(0.1)
                 begin_time_temp_trigger = time.perf_counter()
                 if threading[2]:
                     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -147,19 +152,17 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
                 else:
                     for lockin in bundle.lockins:
                         lockin.send_trigger()
-                        #points_taken += 1
-                        #print(points_taken)
+                if show_progress_bar:
+                    points_taken += 1        
+                    progress_bar.update(points_taken)
                 time_trigger_send += time.perf_counter() - begin_time_temp_trigger    
             time_fast_loop += time.perf_counter() - begin_time_temp_fast_loop  
             
             begin_time_temp_trace = time.perf_counter()
             if threading[3]:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    #data = [executor.submit(trace_tuble,trace) for trace in traces]
                     data = executor.map(trace_tuble,traces)
-                #print(data)
-                #for d in data: print(d)
-                #break
+
                 data = list(data)
             else:
                 data = []
