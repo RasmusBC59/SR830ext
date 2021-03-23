@@ -1,4 +1,5 @@
 import numpy as np
+import logging
 import concurrent.futures
 import time
 import progressbar
@@ -7,6 +8,13 @@ from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ParameterWithSetpoints, Parameter, DelegateParameter
 from qcodes import Measurement
 from SR830_ext import GeneratedSetPoints 
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s:%(name)s:%(message)s')
+file_handler = logging.FileHandler('bundletimeing.log')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
 
 
 class BundleLockin(Instrument):
@@ -75,7 +83,8 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
          threading=[True,True,True,True],
          show_progress_bar = True
               ):
-
+    logger.info('Starting do2d_multi with {}'.format(num_points_slow * num_points_fast)
+    logger.info('write_in_background {},threading buffer_reset {},threading send_trigger {},threading  get trace {}'.format(b for b in threading))
     begin_time = time.perf_counter()
     meas = Measurement()
     bundle.set_sweep_parameters(param_fast, start_fast,stop_fast,num_points_fast, label="Voltage")
@@ -159,10 +168,10 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
             datasaver.add_result(*data)
 
     message = 'Have finished the measurement in {} seconds. run_id {}'.format(time.perf_counter()-begin_time,run_id)
-    print(message)
+    logger.info(message)
     message2 = 'Time used in buffer reset {}. Time used in send trigger {}. Time used in get trace {}'.format(time_buffer_reset,time_trigger_send,time_get_trace)
-    print(message2)
-    print('time in the fast loop {}'.format(time_fast_loop))
-    print('time setting in the fast loop {}'.format(time_set_fast))
+    logger.info(message2)
+    logger.info('time in the fast loop {}'.format(time_fast_loop))
+    logger.info('time setting in the fast loop {}'.format(time_set_fast))
 def trace_tuble(trace):
     return (trace,trace.get())
