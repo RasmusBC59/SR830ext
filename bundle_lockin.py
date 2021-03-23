@@ -173,5 +173,6 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
     logger.info(message2)
     logger.info('time in the fast loop {}'.format(time_fast_loop))
     logger.info('time setting in the fast loop {}'.format(time_set_fast))
+    
 def trace_tuble(trace):
     return (trace,trace.get())
