@@ -84,7 +84,7 @@ def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
          show_progress_bar = True
               ):
     logger.info('Starting do2d_multi with {}'.format(num_points_slow * num_points_fast))
-    #logger.info('write_in_background {},threading buffer_reset {},threading send_trigger {},threading  get trace {}'.format(b for b in threading))
+    logger.info('write_in_background {},threading buffer_reset {},threading send_trigger {},threading  get trace {}'.format(*threading))
     begin_time = time.perf_counter()
     meas = Measurement()
     bundle.set_sweep_parameters(param_fast, start_fast,stop_fast,num_points_fast, label="Voltage")
