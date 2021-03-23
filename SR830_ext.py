@@ -7,23 +7,7 @@ from qcodes.instrument_drivers.stanford_research.SR830 import SR830
 
 
 
-class GeneratedSetPoints(Parameter):
-    """
-    A parameter that generates a setpoint array from start, stop and num points
-    parameters.
-    """
-    def __init__(self, startparam, stopparam, numpointsparam, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._startparam = startparam
-        self._stopparam = stopparam
-        self._numpointsparam = numpointsparam
-
-
-    def get_raw(self):
-        return np.linspace(self._startparam(), self._stopparam(),
-                              self._numpointsparam())        
-
-
+     
 class SR830_ext(SR830):    
         
     def __init__(self, name, address, **kwargs):
@@ -106,4 +90,21 @@ class SR830_ext(SR830):
         self.setpoints.unit = sweep_param.unit
         if label != None:
             self.setpoints.label = label
+
+
+class GeneratedSetPoints(Parameter):
+    """
+    A parameter that generates a setpoint array from start, stop and num points
+    parameters.
+    """
+    def __init__(self, startparam, stopparam, numpointsparam, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._startparam = startparam
+        self._stopparam = stopparam
+        self._numpointsparam = numpointsparam
+
+
+    def get_raw(self):
+        return np.linspace(self._startparam(), self._stopparam(),
+                              self._numpointsparam())   
 

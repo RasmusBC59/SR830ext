@@ -6,7 +6,7 @@ from qcodes.utils.validators import Numbers, Arrays
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ParameterWithSetpoints, Parameter, DelegateParameter
 from qcodes import Measurement
-
+from SR830_ext import GeneratedSetPoints 
 
 
 class BundleLockin(Instrument):
@@ -66,22 +66,6 @@ class BundleLockin(Instrument):
         if label != None:
             self.setpoints.label = label     
 
-
-class GeneratedSetPoints(Parameter):
-    """
-    A parameter that generates a setpoint array from start, stop and num points
-    parameters.
-    """
-    def __init__(self, startparam, stopparam, numpointsparam, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._startparam = startparam
-        self._stopparam = stopparam
-        self._numpointsparam = numpointsparam
-
-
-    def get_raw(self):
-        return np.linspace(self._startparam(), self._stopparam(),
-                              self._numpointsparam())
 
 
 def do2d_multi(param_slow, start_slow, stop_slow, num_points_slow, delay_slow,
