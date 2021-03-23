@@ -201,5 +201,6 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
     logger.info('time in the fast loop {}'.format(time_fast_loop))
     logger.info('time setting in the fast loop {}'.format(time_set_fast))
 
+
 def trace_tuble(trace):
     return (trace, trace.get())
