@@ -30,6 +30,9 @@ class BundleLockin(Instrument):
         super().__init__(name, *args, **kwargs)
 
         self.lockins = lockins
+        for lockin in self.lockins:
+            lockin.buffer_SR('Trigger')
+            lockin.buffer_trig_mode.set('ON')
 
         self.add_parameter('sweep_start',
                            unit='',
@@ -200,6 +203,6 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
     logger.info(message2)
     logger.info('time in the fast loop {}'.format(time_fast_loop))
     logger.info('time setting in the fast loop {}'.format(time_set_fast))
-    
+
 def trace_tuble(trace):
     return (trace, trace.get())
