@@ -91,7 +91,9 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
                bundle: BundleLockin,
                write_period: float = 1.,
                threading: List[bool] = [True, True, True, True],
-               show_progress_bar: bool = True
+               show_progress_bar: bool = True,
+               attempts_to_get:int = 3,
+               delay_fast_increase:float = 0.0
                ):
     """
     This is a do2d only to be used with BundleLockin.
@@ -113,6 +115,8 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
                    and send_trigger and get_trace will be threaded respectively
         show_progress_bar: should a progress bar be displayed during the
                            measurement.
+        attempts_to_get: nummber of attempts to get the buffer before failling
+        delay_fast_increase: increases the delay_fast if failling
     """
 
     logger.info('Starting do2d_multi with {}'.format(num_points_slow * num_points_fast))
@@ -150,51 +154,65 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
 
         for point_slow in interval_slow:
             param_slow.set(point_slow)
-
-            begin_time_temp_buffer = time.perf_counter()
-            if threading[1]:
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    for lockin in bundle.lockins:
-                        executor.submit(lockin.buffer_reset)
-            else:
-                for lockin in bundle.lockins:
-                    lockin.buffer_reset()
-            time_buffer_reset += time.perf_counter() - begin_time_temp_buffer
-
-            begin_time_temp_fast_loop = time.perf_counter()
-            for point_fast in set_points_fast.get():
-                begin_time_temp_set_fast = time.perf_counter()
-                param_fast.set(point_fast)
-
-                time_set_fast += time.perf_counter() - begin_time_temp_set_fast
-                begin_time_temp_trigger = time.perf_counter()
-                if threading[2]:
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
+            
+            attempts = 0
+            while attempts < attempts_to_get:
+                try:               
+                    begin_time_temp_buffer = time.perf_counter()
+                    if threading[1]:
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            for lockin in bundle.lockins:
+                                executor.submit(lockin.buffer_reset)
+                    else:
                         for lockin in bundle.lockins:
-                            executor.submit(lockin.send_trigger)
-                else:
-                    for lockin in bundle.lockins:
-                        lockin.send_trigger()
-                if show_progress_bar:
-                    points_taken += 1
-                    progress_bar.update(points_taken)
-                time_trigger_send += time.perf_counter() - begin_time_temp_trigger    
-            time_fast_loop += time.perf_counter() - begin_time_temp_fast_loop
+                            lockin.buffer_reset()
+                    time_buffer_reset += time.perf_counter() - begin_time_temp_buffer
 
-            begin_time_temp_trace = time.perf_counter()
-            if threading[3]:
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    data = executor.map(trace_tuble, traces)
+                    begin_time_temp_fast_loop = time.perf_counter()
+                    for point_fast in set_points_fast.get():
+                        begin_time_temp_set_fast = time.perf_counter()
+                        param_fast.set(point_fast)
 
-                data = list(data)
-            else:
-                data = []
-                for trace in traces:
-                    data.append((trace, trace.get()))
-            time_get_trace += time.perf_counter() - begin_time_temp_trace
+                        time_set_fast += time.perf_counter() - begin_time_temp_set_fast
+                        begin_time_temp_trigger = time.perf_counter()
+                        if threading[2]:
+                            with concurrent.futures.ThreadPoolExecutor() as executor:
+                                for lockin in bundle.lockins:
+                                    executor.submit(lockin.send_trigger)
+                        else:
+                            for lockin in bundle.lockins:
+                                lockin.send_trigger()
+                        if show_progress_bar and attempts == 0:
+                            points_taken += 1
+                            progress_bar.update(points_taken)
+                        time_trigger_send += time.perf_counter() - begin_time_temp_trigger    
+                    time_fast_loop += time.perf_counter() - begin_time_temp_fast_loop
 
-            data.append((param_slow, param_slow.get()))
-            data.append((set_points_fast, set_points_fast.get()))
+                    begin_time_temp_trace = time.perf_counter()
+                    if threading[3]:
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            data = executor.map(trace_tuble, traces)
+
+                        data = list(data)
+                    else:
+                        data = []
+                        for trace in traces:
+                            data.append((trace, trace.get()))
+                    time_get_trace += time.perf_counter() - begin_time_temp_trace
+
+                    data.append((param_slow, param_slow.get()))
+                    data.append((set_points_fast, set_points_fast.get()))
+                    break
+                except Exception as e:
+                    print(e)
+                    attempts += 1
+                    delay_fast += delay_fast_increase
+                    print(attempts)
+                    print(delay_fast)
+                    if attempts < attempts_to_get:
+                        print('getting the buffer failed, will try again')
+                    else:
+                        print('getting the buffer failed, will go to next slow_point')
             datasaver.add_result(*data)
 
     message = 'Have finished the measurement in {} seconds. run_id {}'.format(time.perf_counter()-begin_time, run_id)
