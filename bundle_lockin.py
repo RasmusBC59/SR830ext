@@ -8,7 +8,7 @@ from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ParameterWithSetpoints, _BaseParameter
 from qcodes import Measurement
 from SR830_ext import GeneratedSetPoints 
-from typing import List
+from typing import List, Union
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -82,6 +82,9 @@ class BundleLockin(Instrument):
         self.setpoints.unit = sweep_param.unit
         if label is not None:
             self.setpoints.label = label
+        elif sweep_param.label is not None:
+            self.setpoints.label = sweep_param.label
+
 
 
 def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
@@ -93,7 +96,8 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
                threading: List[bool] = [True, True, True, True],
                show_progress_bar: bool = True,
                attempts_to_get:int = 3,
-               delay_fast_increase:float = 0.0
+               delay_fast_increase:float = 0.0,
+               label: Union[str, None] = None 
                ):
     """
     This is a do2d only to be used with BundleLockin.
@@ -123,7 +127,7 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
     logger.info('write_in_background {},threading buffer_reset {},threading send_trigger {},threading  get trace {}'.format(*threading))
     begin_time = time.perf_counter()
     meas = Measurement()
-    bundle.set_sweep_parameters(param_fast, start_fast, stop_fast, num_points_fast, label="Voltage")
+    bundle.set_sweep_parameters(param_fast, start_fast, stop_fast, num_points_fast, label = label)
     interval_slow = np.linspace(start_slow, stop_slow, num_points_slow)
     meas.write_period = write_period
     set_points_fast = bundle.setpoints
