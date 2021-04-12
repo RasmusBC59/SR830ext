@@ -5,24 +5,6 @@ import time
 from tqdm import tqdm_notebook as tqdm
 from qcodes.instrument.parameter import _BaseParameter
 from qcodes import Measurement
-# IMPORTS
-
-#%matplotlib notebook
-import qcodes as qc
-import os
-import numpy as np
-from time import sleep
-from qcodes.instrument_drivers.stanford_research.SR830 import SR830
-
-from qcodes.instrument.base import Instrument
-from qcodes.utils.validators import Numbers, Arrays
-import qcodes.instrument_drivers.agilent.Agilent_34400A as agi
-
-
-
-
-from qcodes import initialise_or_create_database_at, load_or_create_experiment, load_by_id
-from qcodes.dataset.plotting import plot_dataset
 from typing import List
 
 logger = logging.getLogger(__name__)
@@ -37,14 +19,13 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
                param_fast: _BaseParameter, start_fast: float, stop_fast: float,
                num_points_fast: int, delay_fast: float,
                lockins,
-               devices = None,
+               devices_no_buffer = None,
                write_period: float = 1.,
                threading: List[bool] = [True, True, True, True],
-               show_progress_bar: bool = True,
                label: str = None
                ):
     """
-    This is a do2d only to be used with BundleLockin.
+    This is a do2d to be used for buffered instruments.
 
     Args:
         param_slow: The QCoDeS parameter to sweep over in the outer loop
@@ -69,7 +50,9 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
     logger.info('write_in_background {},threading buffer_reset {},threading send_trigger {},threading  get trace {}'.format(*threading))
     begin_time = time.perf_counter()
     meas = Measurement()
-    meas_single = Measurement()
+    
+
+
     for lockin in lockins:
         lockin.buffer_SR("Trigger")
         lockin.buffer_trig_mode.set('ON')
@@ -80,16 +63,11 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
     set_points_fast = lockins[0].sweep_setpoints
 
     meas.write_period = write_period
-    meas_single.write_period = write_period
-     # this mean Lockin must be the forst dvice make genaral
-
     meas.register_parameter(set_points_fast)
     meas.register_parameter(param_fast)
-    meas_single.register_parameter(param_fast)
-    param_fast.post_delay = delay_fast
-
     meas.register_parameter(param_slow)
-    meas_single.register_parameter(param_slow)
+
+    param_fast.post_delay = delay_fast
     param_slow.post_delay = delay_slow
 
     #bundle_parameters = bundle.__dict__['parameters']
@@ -98,9 +76,13 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
     for trace in traces:
         meas.register_parameter(trace, setpoints=(param_slow, set_points_fast))
     
-    if devices is not None:
-        for device in devices:
-            meas_single.register_parameter(device, setpoints=(param_slow, param_fast))
+    if devices_no_buffer is not None:
+        meas_no_buffer = Measurement()
+        meas_no_buffer.write_period = write_period
+        meas_no_buffer.register_parameter(param_fast)
+        meas_no_buffer.register_parameter(param_slow)
+        for device in devices_no_buffer:
+            meas_no_buffer.register_parameter(device, setpoints=(param_slow, param_fast))
 
 
     time_fast_loop = 0.0
@@ -109,19 +91,18 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
     time_trigger_send = 0.0
     time_get_trace = 0.0
 
-    #if show_progress_bar:
-    #    progress_bar = progressbar.ProgressBar(max_value=num_points_slow * num_points_fast)
-    #    points_taken = 0
 
-    with meas.run(write_in_background=threading[0]) as datasaver, meas_single.run(write_in_background=threading[0])  as datasaver_single:
-        run_id = datasaver.run_id
+    with meas.run(write_in_background=threading[0]) as datasaver, meas_no_buffer.run(write_in_background=threading[0])  as datasaver_no_buffer:
+
 
         for point_slow in interval_slow:
             param_slow.set(point_slow)
             data = []
             data.append((param_slow, param_slow.get()))
-            data_single = []
-            data_single.append((param_slow, param_slow.get()))
+
+            if devices_no_buffer is not None:
+                data_no_buffer = []
+                data_no_buffer.append((param_slow, param_slow.get()))
 
             begin_time_temp_buffer = time.perf_counter()
             if threading[1]:
@@ -149,27 +130,25 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
                 else:
                     for lockin in lockins:
                         lockin.send_trigger()
-               # if show_progress_bar:
-                #    points_taken += 1
-                 #   progress_bar.update(points_taken)
+
                 time_trigger_send += time.perf_counter() - begin_time_temp_trigger
                 
-                if devices is not None:
-                    #data_single = []
+                if devices_no_buffer is not None:
                     fast = param_fast.get()
-                    data_single.append((param_fast, fast))
-                    for device in devices: 
+                    data_no_buffer.append((param_fast, fast))
+                    for device in devices_no_buffer: 
                         device_value = device.get()
-                        data_single.append((device, device_value))
-                    datasaver_single.add_result(*data_single)    
+                        data_no_buffer.append((device, device_value))
+                    datasaver_no_buffer.add_result(*data_no_buffer)
+
             time_fast_loop += time.perf_counter() - begin_time_temp_fast_loop
 
             begin_time_temp_trace = time.perf_counter()
             if threading[3]:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    data = executor.map(trace_tuble, traces)
+                    data_trace = executor.map(trace_tuble, traces)
 
-                data = list(data)
+                data += list(data_trace)
             else:
                 #data = []
                 for trace in traces:
@@ -180,7 +159,7 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
             data.append((set_points_fast, set_points_fast.get()))
             datasaver.add_result(*data)
 
-    message = 'Have finished the measurement in {} seconds. run_id {}'.format(time.perf_counter()-begin_time, run_id)
+    message = 'Have finished the measurement in {} seconds'.format(time.perf_counter()-begin_time)
     logger.info(message)
     message2 = 'Time used in buffer reset {}. Time used in send trigger {}. Time used in get trace {}'.format(time_buffer_reset, time_trigger_send, time_get_trace)
     logger.info(message2)
