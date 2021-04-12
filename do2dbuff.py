@@ -22,7 +22,8 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
                devices_no_buffer = None,
                write_period: float = 1.,
                threading: List[bool] = [True, True, True, True],
-               label: str = None
+               label: str = None,
+               channels = 0
                ):
     """
     This is a do2d to be used for buffered instruments.
@@ -70,9 +71,13 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
     param_fast.post_delay = delay_fast
     param_slow.post_delay = delay_slow
 
-    #bundle_parameters = bundle.__dict__['parameters']
-    traces = [lockin.ch1_datatrace for lockin in lockins]
-    #traces = [bundle_parameters[key] for key in bundle_parameters.keys() if 'trace' in key]
+   
+    traces = []
+    if channels in [0,1]:
+        traces += [lockin.ch1_datatrace for lockin in lockins]
+    if channels in [0,2]:
+        traces += [lockin.ch2_datatrace for lockin in lockins]
+
     for trace in traces:
         meas.register_parameter(trace, setpoints=(param_slow, set_points_fast))
     
