@@ -100,12 +100,12 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
     time_buffer_reset = 0.0
     time_trigger_send = 0.0
     time_get_trace = 0.0
-    #my_meas (meas.run(write_in_background=threading[0]) as datasaver, meas_no_buffer.run(write_in_background=threading[0])  as datasaver_no_buffer
+    
     cm_datasaver = meas.run(write_in_background=threading[0])
     if devices_no_buffer is not None: 
         cm_datasaver_no_buffer = meas_no_buffer.run(write_in_background=threading[0])
 
-    with ExitStack() as cmx: #cm1 as datasaver, cm2 as datasaver_no_buffer:
+    with ExitStack() as cmx: 
         cmx.enter_context(cm_datasaver)
         datasaver = cm_datasaver.datasaver
         if devices_no_buffer is not None:  
@@ -168,12 +168,10 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
 
                         data += list(data_trace)
                     else:
-                        #data = []
                         for trace in traces:
                             data.append((trace, trace.get()))
                     time_get_trace += time.perf_counter() - begin_time_temp_trace
 
-                    #data.append((param_slow, param_slow.get()))
                     data.append((set_points_fast, set_points_fast.get()))
                     break
                 except Exception as e:
