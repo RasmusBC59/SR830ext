@@ -29,7 +29,7 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
                delay_fast_increase:float = 0.0
                ):
     """
-    This is a do2d to be used for buffered instruments.
+    This is a do2d to be used for a collection of SR830.
 
     Args:
         param_slow: The QCoDeS parameter to sweep over in the outer loop
@@ -83,6 +83,8 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
         traces += [lockin.ch2_datatrace for lockin in lockins]
 
     for trace in traces:
+        if len(trace.label.split()) < 2: 
+            trace.label = trace.root_instrument.name + ' ' + trace.label
         meas.register_parameter(trace, setpoints=(param_slow, set_points_fast))
     
     if devices_no_buffer is not None:
