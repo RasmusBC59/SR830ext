@@ -85,8 +85,8 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
     for trace in traces:
         if len(trace.label.split()) < 2: 
             trace.label = trace.root_instrument.name + ' ' + trace.label
-        meas.register_parameter(trace, setpoints=(param_slow, set_points_fast))
-    
+        meas.register_parameter(trace, setpoints=(param_slow, trace.root_instrument.sweep_setpoints))
+        
     if devices_no_buffer is not None:
         meas_no_buffer = Measurement()
         meas_no_buffer.write_period = write_period
