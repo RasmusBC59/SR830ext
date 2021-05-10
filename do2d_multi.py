@@ -193,7 +193,11 @@ def do2d_multi(param_slow: _BaseParameter, start_slow: float, stop_slow: float,
     message2 = 'Time used in buffer reset {}. Time used in send trigger {}. Time used in get trace {}'.format(time_buffer_reset, time_trigger_send, time_get_trace)
     logger.info(message2)
     logger.info('time in the fast loop {}'.format(time_fast_loop))
-    logger.info('time setting in the fast loop {}'.format(time_set_fast))
+    
+    if devices_no_buffer is not None:
+        return (datasaver.dataset,datasaver_no_buffer.dataset)
+    else: 
+        return datasaver.dataset 
 
 def trace_tuble(trace):
     return (trace, trace.get())
